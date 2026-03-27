@@ -1,7 +1,8 @@
 // 智能家居设备控制面板 - 严格对齐设计稿
+import { common } from '@kit.AbilityKit'
 import { promptAction } from '@kit.ArkUI'
 import { DeviceItemData } from '../model/DeviceItemData'
-import { DeviceMockRepository } from '../mock/DeviceMockRepository'
+import { DeviceStateRepository } from '../store/DeviceStateRepository'
 
 const PHONE_PADDING: number = 16
 const LANDSCAPE_PADDING: number = 20
@@ -15,6 +16,7 @@ const TABLET_BREAKPOINT: number = 840
 struct DeviceCard {
   @ObjectLink device: DeviceItemData
   isTabletLayout: boolean = false
+  isHighlighted: boolean = false
   onToggle: () => void = () => {}
 
   build() {
@@ -78,13 +80,17 @@ struct DeviceCard {
     .width('100%')
     .padding({ left: 16, right: 16, top: this.getVerticalPadding(), bottom: this.getVerticalPadding() })
     .borderRadius(20)
+    .border({
+      width: this.isHighlighted ? 1.5 : 0,
+      color: this.isHighlighted ? '#66FFFFFF' : '#00FFFFFF'
+    })
     .backdropBlur(60)
-    .backgroundColor('#B3FFFFFF')  // 半透明白色毛玻璃效果
+    .backgroundColor(this.isHighlighted ? '#CCFFFFFF' : '#B3FFFFFF')  // 半透明白色毛玻璃效果
     .shadow({
-      radius: 16,
-      color: '#1A000000',
+      radius: this.isHighlighted ? 20 : 16,
+      color: this.isHighlighted ? '#33000000' : '#1A000000',
       offsetX: 0,
-      offsetY: 4
+      offsetY: this.isHighlighted ? 8 : 4
     })
   }
 
@@ -115,15 +121,24 @@ struct DeviceCard {
 @Entry
 @Component
 struct Index {
-  @State devices: DeviceItemData[] = DeviceMockRepository.getInitialDevices()
+  private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext
+  @StorageLink('targetDeviceId') targetDeviceId: string = '0'
+  @State devices: DeviceItemData[] = []
   @State isRefreshing: boolean = false
-  @State refreshRound: number = 0
   @State laneCount: number = 1
   @State pagePadding: number = PHONE_PADDING
   @State listSpace: number = PHONE_LIST_SPACE
   @State titleFontSize: number = 24
   @State titleTopPadding: number = 12
   @State isTabletLayout: boolean = false
+
+  aboutToAppear(): void {
+    void this.loadDevices()
+  }
+
+  onPageShow(): void {
+    void this.loadDevices()
+  }
 
   build() {
     Stack() {
@@ -149,6 +164,17 @@ struct Index {
           .width('100%')
           .margin({ bottom: 14 })
 
+        if (this.hasHighlightedDevice()) {
+          Text(`桌面卡片已定位到 ${this.getHighlightedDeviceName()}`)
+            .fontSize(13)
+            .fontColor('#FFFFFF')
+            .width('100%')
+            .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+            .margin({ bottom: 14 })
+            .backgroundColor('#73262F3B')
+            .borderRadius(16)
+        }
+
         // 设备卡片列表 - 支持下拉刷新
         Refresh({ refreshing: $$this.isRefreshing }) {
           List({ space: this.listSpace }) {
@@ -157,8 +183,9 @@ struct Index {
                 DeviceCard({
                   device: device,
                   isTabletLayout: this.isTabletLayout,
+                  isHighlighted: this.targetDeviceId === device.id.toString(),
                   onToggle: () => {
-                    this.toggleDevice(device)
+                    void this.toggleDevice(device)
                   }
                 })
               }
@@ -169,9 +196,8 @@ struct Index {
           .lanes(this.laneCount)
         }
         .onRefreshing(() => {
-          setTimeout(() => {
-            this.refreshRound += 1
-            this.devices = DeviceMockRepository.getDevicesForRound(this.refreshRound)
+          setTimeout(async () => {
+            this.devices = await DeviceStateRepository.refreshDevices(this.context)
             this.isRefreshing = false
             promptAction.showToast({
               message: `设备状态已刷新，当前共${this.devices.length}台设备`,
@@ -203,6 +229,10 @@ struct Index {
     return 0
   }
 
+  async loadDevices(): Promise<void> {
+    this.devices = await DeviceStateRepository.loadDevices(this.context)
+  }
+
   updateResponsiveLayout(widthValue: Length, heightValue: Length) {
     const width: number = this.normalizeSize(widthValue)
     const height: number = this.normalizeSize(heightValue)
@@ -221,9 +251,17 @@ struct Index {
     this.isTabletLayout = isTablet
   }
 
-  toggleDevice(device: DeviceItemData) {
-    device.isOn = !device.isOn
-    DeviceMockRepository.updateDeviceAfterToggle(device)
+  hasHighlightedDevice(): boolean {
+    return this.getHighlightedDeviceName().length > 0
+  }
+
+  getHighlightedDeviceName(): string {
+    let target = this.devices.find((item: DeviceItemData) => item.id.toString() === this.targetDeviceId)
+    return target ? target.name : ''
+  }
+
+  async toggleDevice(device: DeviceItemData): Promise<void> {
+    this.devices = await DeviceStateRepository.toggleDevice(this.context, device.id)
     promptAction.showToast({
       message: `${device.name}状态已更新`,
       duration: 3000

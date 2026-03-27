@@ -5,12 +5,14 @@ import { window } from '@kit.ArkUI';
 const DOMAIN = 0x0000;
 
 export default class EntryAbility extends UIAbility {
-  onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+  onCreate(want: Want, _launchParam: AbilityConstant.LaunchParam): void {
     try {
       this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
     } catch (err) {
       hilog.error(DOMAIN, 'testTag', 'Failed to set colorMode. Cause: %{public}s', JSON.stringify(err));
     }
+    AppStorage.setOrCreate('targetDeviceId', '0');
+    this.syncTargetDevice(want);
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
   }
 
@@ -31,6 +33,11 @@ export default class EntryAbility extends UIAbility {
     });
   }
 
+  onNewWant(want: Want, _launchParam: AbilityConstant.LaunchParam): void {
+    hilog.info(DOMAIN, 'testTag', 'Ability onNewWant: %{public}s', JSON.stringify(want?.parameters));
+    this.syncTargetDevice(want);
+  }
+
   onWindowStageDestroy(): void {
     // Main window is destroyed, release UI related resources
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageDestroy');
@@ -44,5 +51,19 @@ export default class EntryAbility extends UIAbility {
   onBackground(): void {
     // Ability has back to background
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onBackground');
+  }
+
+  private syncTargetDevice(want: Want): void {
+    if (!want?.parameters?.params) {
+      return;
+    }
+    try {
+      let params = JSON.parse(want.parameters.params as string) as Record<string, string>;
+      if (params.targetDeviceId) {
+        AppStorage.setOrCreate('targetDeviceId', params.targetDeviceId);
+      }
+    } catch (error) {
+      hilog.error(DOMAIN, 'testTag', 'Failed to parse router params. Cause: %{public}s', JSON.stringify(error));
+    }
   }
 }

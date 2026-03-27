@@ -1,30 +1,32 @@
 # openharmonyUI
 
-## GitHub Copilot PR Review
+一个基于 HarmonyOS / ArkTS 的智能家居设备控制面板示例项目。
 
-这个仓库改成使用 GitHub 官方的 Copilot code review，不再使用自建的 GitHub Actions review bot。
+## 功能
 
-仓库级指引文件在：
+- 智能家居设备列表展示
+- 设备开关与播放状态切换
+- 下拉刷新设备状态
+- 手机 / 平板自适应布局
+- 桌面卡片（Form）联动展示
+- 基于本地 mock 数据的设备状态持久化
 
-- `.github/copilot-instructions.md`
+## 运行方式
 
-这个文件会告诉 Copilot 在这个 HarmonyOS / ArkTS 项目里应该优先关注哪些问题。
+1. 使用 DevEco Studio 打开本项目。
+2. 确认本地已安装 HarmonyOS SDK `6.0.2`。
+3. 选择设备或模拟器后运行 `entry` 模块。
 
-### 手动触发 Review
+## 目录
 
-在 PR 页面打开 `Reviewers`，选择 `Copilot` 即可请求官方 review。
+- `entry/src/main/ets/pages/`：主页面
+- `entry/src/main/ets/model/`：数据模型
+- `entry/src/main/ets/mock/`：mock 数据仓库
+- `entry/src/main/ets/store/`：设备状态与桌面卡片同步逻辑
+- `entry/src/main/ets/form/`：桌面卡片页面
+- `entry/src/main/resources/rawfile/`：界面图片与图标资源
 
-### 自动触发 Review
+## 说明
 
-如果你有 Copilot Pro，可以在 GitHub 仓库里开启自动 review。常见路径是：
-
-`Settings -> Rules -> Rulesets -> New branch ruleset`
-
-在规则里开启 `Automatically request Copilot code review`。如果需要，也可以同时打开：
-
-- `Review new pushes`
-- `Review draft pull requests`
-
-### 说明
-
-这个方案不需要你自己提供 OpenAI API key，但需要你的 GitHub 账号或所属组织具备 GitHub Copilot code review 能力。
+- 当前设备数据主要来自 mock 数据，适合演示 UI、交互和卡片联动。
+- 仓库已支持 GitHub Copilot PR review，可通过 `.github/copilot-instructions.md` 提供审查上下文。
