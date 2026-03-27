@@ -1,12 +1,38 @@
-// 智能设备数据模型
-interface DeviceInfo {
-  id: number
+// 智能家居设备控制面板 - HarmonyOS ArkUI
+
+@Observed
+class DeviceItemData {
+  id: number = 0
+  name: string = ''
+  isOn: boolean = false
+  type: 'light' | 'ac' | 'speaker' | 'curtain' = 'light'
+  value: number = 0
+  room: string = ''
+
+  constructor(id: number, name: string, type: 'light' | 'ac' | 'speaker' | 'curtain',
+    isOn: boolean, value: number, room: string) {
+    this.id = id
+    this.name = name
+    this.type = type
+    this.isOn = isOn
+    this.value = value
+    this.room = room
+  }
+}
+
+@Observed
+class SceneModeData {
   name: string
-  icon: Resource
-  isOn: boolean
-  type: 'light' | 'ac' | 'speaker' | 'curtain'
-  value: number // 亮度/温度/音量/开合度
-  room: string
+  icon: string
+  color: string
+  isActive: boolean
+
+  constructor(name: string, icon: string, color: string, isActive: boolean) {
+    this.name = name
+    this.icon = icon
+    this.color = color
+    this.isActive = isActive
+  }
 }
 
 @Component
@@ -15,7 +41,6 @@ struct DeviceCard {
   onToggle: () => void = () => {}
   onValueChange: (val: number) => void = () => {}
   @State private scaleVal: number = 1
-  @State private isPressed: boolean = false
 
   getIconText(): string {
     if (this.device.type === 'light') return '💡'
@@ -43,7 +68,6 @@ struct DeviceCard {
     Column() {
       // 顶部：图标 + 开关
       Row() {
-        // 设备图标圆形背景
         Stack() {
           Circle()
             .width(48)
@@ -85,7 +109,7 @@ struct DeviceCard {
 
       Blank()
 
-      // 数值显示
+      // 数值 + 滑动条（仅开启时显示）
       if (this.device.isOn) {
         Text(this.getValueLabel())
           .fontSize(13)
@@ -93,9 +117,7 @@ struct DeviceCard {
           .fontWeight(FontWeight.Medium)
           .margin({ bottom: 8 })
           .alignSelf(ItemAlign.Start)
-          .transition({ type: TransitionType.Insert, opacity: 0 })
 
-        // 滑动条
         Slider({
           value: this.device.value,
           min: this.device.type === 'ac' ? 16 : 0,
@@ -109,7 +131,6 @@ struct DeviceCard {
             this.onValueChange(value)
           })
           .width('100%')
-          .transition({ type: TransitionType.Insert, opacity: 0 })
       }
     }
     .width('100%')
@@ -128,56 +149,10 @@ struct DeviceCard {
     .onTouch((event: TouchEvent) => {
       if (event.type === TouchType.Down) {
         this.scaleVal = 0.95
-        this.isPressed = true
       } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
         this.scaleVal = 1
-        this.isPressed = false
       }
     })
-  }
-}
-
-// 场景模式数据
-interface SceneMode {
-  name: string
-  icon: string
-  color: string
-  isActive: boolean
-}
-
-@Observed
-class DeviceItemData {
-  id: number = 0
-  name: string = ''
-  icon: string = ''
-  isOn: boolean = false
-  type: 'light' | 'ac' | 'speaker' | 'curtain' = 'light'
-  value: number = 0
-  room: string = ''
-
-  constructor(id: number, name: string, type: 'light' | 'ac' | 'speaker' | 'curtain',
-    isOn: boolean, value: number, room: string) {
-    this.id = id
-    this.name = name
-    this.type = type
-    this.isOn = isOn
-    this.value = value
-    this.room = room
-  }
-}
-
-@Observed
-class SceneModeData {
-  name: string
-  icon: string
-  color: string
-  isActive: boolean
-
-  constructor(name: string, icon: string, color: string, isActive: boolean) {
-    this.name = name
-    this.icon = icon
-    this.color = color
-    this.isActive = isActive
   }
 }
 
@@ -200,8 +175,6 @@ struct Index {
     new SceneModeData('离家模式', '👋', '#78909C', false),
   ]
 
-  @State currentTemp: string = '26°C'
-  @State currentHumidity: string = '65%'
   @State greeting: string = ''
 
   aboutToAppear() {
@@ -216,9 +189,47 @@ struct Index {
     return this.devices.filter(d => d.isOn).length
   }
 
+  getDeviceRows(): DeviceItemData[][] {
+    let rows: DeviceItemData[][] = []
+    for (let i = 0; i < this.devices.length; i += 2) {
+      if (i + 1 < this.devices.length) {
+        rows.push([this.devices[i], this.devices[i + 1]])
+      } else {
+        rows.push([this.devices[i]])
+      }
+    }
+    return rows
+  }
+
+  applyScene(scene: SceneModeData, index: number) {
+    this.scenes.forEach((s, i) => {
+      s.isActive = (i === index)
+    })
+    if (scene.name === '睡眠模式') {
+      this.devices.forEach(d => {
+        if (d.type === 'light') d.isOn = false
+        if (d.name === '床头灯') { d.isOn = true; d.value = 10 }
+        if (d.type === 'ac') { d.isOn = true; d.value = 22 }
+      })
+    } else if (scene.name === '回家模式') {
+      this.devices.forEach(d => {
+        if (d.name === '客厅主灯') { d.isOn = true; d.value = 75 }
+        if (d.type === 'ac') d.isOn = true
+      })
+    } else if (scene.name === '影院模式') {
+      this.devices.forEach(d => {
+        if (d.type === 'light') { d.isOn = true; d.value = 15 }
+        if (d.name === '窗帘') { d.isOn = true; d.value = 100 }
+        if (d.name === '智能音箱') { d.isOn = true; d.value = 70 }
+      })
+    } else if (scene.name === '离家模式') {
+      this.devices.forEach(d => { d.isOn = false })
+    }
+  }
+
   build() {
     Column() {
-      // ===== 顶部状态栏 =====
+      // ===== 顶部问候 =====
       Row() {
         Column() {
           Text(this.greeting)
@@ -236,7 +247,7 @@ struct Index {
 
         // 环境信息胶囊
         Row() {
-          Text(`🌡 ${this.currentTemp}`)
+          Text('🌡 26°C')
             .fontSize(13)
             .fontColor('#616161')
           Divider()
@@ -244,7 +255,7 @@ struct Index {
             .height(14)
             .margin({ left: 8, right: 8 })
             .color('#E0E0E0')
-          Text(`💧 ${this.currentHumidity}`)
+          Text('💧 65%')
             .fontSize(13)
             .fontColor('#616161')
         }
@@ -288,54 +299,7 @@ struct Index {
             })
             .animation({ duration: 300, curve: Curve.EaseInOut })
             .onClick(() => {
-              this.scenes.forEach((s, i) => {
-                s.isActive = (i === index)
-              })
-              // 场景联动：根据选中场景切换设备状态
-              if (scene.name === '睡眠模式') {
-                this.devices.forEach(d => {
-                  if (d.type === 'light') {
-                    d.isOn = false
-                  }
-                  if (d.name === '床头灯') {
-                    d.isOn = true
-                    d.value = 10
-                  }
-                  if (d.type === 'ac') {
-                    d.isOn = true
-                    d.value = 22
-                  }
-                })
-              } else if (scene.name === '回家模式') {
-                this.devices.forEach(d => {
-                  if (d.name === '客厅主灯') {
-                    d.isOn = true
-                    d.value = 75
-                  }
-                  if (d.type === 'ac') {
-                    d.isOn = true
-                  }
-                })
-              } else if (scene.name === '影院模式') {
-                this.devices.forEach(d => {
-                  if (d.type === 'light') {
-                    d.isOn = true
-                    d.value = 15
-                  }
-                  if (d.name === '窗帘') {
-                    d.isOn = true
-                    d.value = 100
-                  }
-                  if (d.name === '智能音箱') {
-                    d.isOn = true
-                    d.value = 70
-                  }
-                })
-              } else if (scene.name === '离家模式') {
-                this.devices.forEach(d => {
-                  d.isOn = false
-                })
-              }
+              this.applyScene(scene, index)
             })
           })
         }
@@ -344,7 +308,7 @@ struct Index {
       .scrollable(ScrollDirection.Horizontal)
       .scrollBar(BarState.Off)
 
-      // ===== 设备卡片网格 =====
+      // ===== 设备卡片 =====
       Text('我的设备')
         .fontSize(18)
         .fontWeight(FontWeight.Bold)
@@ -353,10 +317,8 @@ struct Index {
         .padding({ left: 20 })
         .alignSelf(ItemAlign.Start)
 
-      // 设备网格
       Scroll() {
         Column({ space: 12 }) {
-          // 两列网格布局
           ForEach(this.getDeviceRows(), (row: DeviceItemData[], rowIndex: number) => {
             Row({ space: 12 }) {
               ForEach(row, (device: DeviceItemData) => {
@@ -371,7 +333,6 @@ struct Index {
                 })
                   .layoutWeight(1)
               })
-              // 如果这行只有一个设备，补一个空白占位
               if (row.length === 1) {
                 Column().layoutWeight(1)
               }
@@ -387,17 +348,5 @@ struct Index {
     .width('100%')
     .height('100%')
     .backgroundColor('#FAFAFA')
-  }
-
-  getDeviceRows(): DeviceItemData[][] {
-    let rows: DeviceItemData[][] = []
-    for (let i = 0; i < this.devices.length; i += 2) {
-      if (i + 1 < this.devices.length) {
-        rows.push([this.devices[i], this.devices[i + 1]])
-      } else {
-        rows.push([this.devices[i]])
-      }
-    }
-    return rows
   }
 }
